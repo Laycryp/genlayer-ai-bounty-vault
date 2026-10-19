@@ -1,23 +1,22 @@
 # AI Smart Contract Bug Bounty Vault
 
-An autonomous, AI-driven bug bounty platform built on GenLayer.
-This Intelligent Contract manages multiple bug bounties simultaneously, evaluating submitted security patches through non-deterministic LLM consensus before autonomously recording successful resolutions.
+An autonomous, AI-driven bug bounty platform built on GenLayer. This Intelligent Contract manages multiple concurrent bug bounties, verifying submitted security patches by fetching and cross-evaluating the original versioned source code from the protocol repository alongside the complete proposed patch through validator consensus.
 
 ## Architectural Overview
 
-This contract demonstrates advanced state management and strict adherence to GenVM security standards, solving real-world Web3 security coordination.
+This contract implements end-to-end evidence verification and adheres strictly to GenVM security and storage constraints:
 
-* **Complex State Management:** Bypasses basic flat storage limitations by utilizing serialized JSON dictionaries to manage an arbitrary number of concurrent bounties within a single state variable.
-* **Zero-Trust Access Control:** Enforces strict role-based execution. Only the designated admin (set at initialization) can create bounties.
-* **Deterministic Consensus on Non-Deterministic Data:** Evaluates external patch URLs by rendering Web2 data and running it through an LLM.
-The state transition only occurs if validators achieve strict consensus (`gl.eq_principle.strict_eq`) on the validity of the patch.
-* **GenVM Parsing Compliance:** Utilizes direct string concatenation for complex LLM prompts, completely avoiding GenVM's known parsing issues with multi-line f-strings and nested brackets.
-* **Graceful Degradation:** Wraps all external web fetches and LLM JSON parsing in robust `try/except` blocks, ensuring the contract fails safely rather than bricking the state during timeouts.
+* **Versioned Source Context Acquisition:** Rather than relying solely on text descriptions, each bounty binds a specific `source_version` (branch or commit hash) and `vulnerable_file_path` to the configured `protocol_repo_url`.
+* **Dual-Fetch Consensus Verification:** Inside the non-deterministic consensus block (`gl.eq_principle.strict_eq`), validators independently fetch both the original vulnerable source file from the protocol repository and the complete submitted patch without character truncation.
+* **Complex State Management:** Utilizes serialized JSON dictionaries to manage multiple independent bounties, tracking target versions, affected file paths, accepted patch URLs, and solver identities within a single contract instance.
+* **Strict Type and Syntax Compliance:** Uses `u256` for reward accounting and direct string concatenation for prompt construction to maintain full compatibility with the GenVM compiler.
+* **Zero-Trust Access Control:** Enforces administrative permissions and solver attribution exclusively through `gl.message.sender`.
+* **Fault-Tolerant Execution:** Wraps both external web renders and LLM JSON parsing in isolated `try/except` blocks to guarantee safe failure handling.
 
 ## Contract Workflow
 
-1. **Initialization:** The contract is deployed with the target protocol's details and the Admin's verified address.
-2. **Bounty Creation:** The Admin invokes `create_bounty` with a unique ID, description, and reward. The state is updated via JSON serialization.
-3. **Patch Submission:** A security researcher submits a URL containing their proposed fix via `submit_patch`.
-4. **AI Consensus:** The GenVM network fetches the patch data, analyzes it against the vulnerability description using LLMs, and votes.
-5. **Resolution:** If strict consensus determines the patch is valid, the bounty is permanently marked as closed and the solver's address is recorded on-chain.
+1. **Initialization:** Deployed with the target protocol name, base raw repository URL (`protocol_repo_url`), and the administrator's address.
+2. **Bounty Registration:** The administrator calls `create_bounty` with a unique identifier, vulnerability description, affected file path, target source version, and reward amount.
+3. **Patch Evaluation:** A researcher calls `submit_patch` with the bounty identifier and a link to the complete patch.
+4. **Validator Consensus:** Validators retrieve the original vulnerable source code and the full patch, verifying that the vulnerability exists in the specified version and that the patch resolves it completely without regressions.
+5. **Resolution:** Upon achieving strict consensus, the contract locks the bounty, records the caller's address and accepted patch URL, and increments the total payout counter.
